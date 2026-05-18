@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>工单系统</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      background: #f0f2f5;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #333;
+      padding: 40px 16px;
+    }
+
+    .container {
+      max-width: 560px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+      padding: 28px;
+      margin-bottom: 24px;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    h2 {
+      font-size: 1.1rem;
+      margin-bottom: 16px;
+      color: #555;
+    }
+
+    label {
+      display: block;
+      font-size: 0.875rem;
+      font-weight: 500;
+      margin-bottom: 6px;
+      color: #555;
+    }
+
+    input,
+    textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      margin-bottom: 16px;
+      transition: border-color 0.2s;
+    }
+
+    input:focus,
+    textarea:focus {
+      outline: none;
+      border-color: #4a90d9;
+    }
+
+    textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      background: #4a90d9;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background: #3a7bc8;
+    }
+
+    button:disabled {
+      background: #a0c4e8;
+      cursor: not-allowed;
+    }
+
+    .message {
+      margin-top: 12px;
+      font-size: 0.875rem;
+      text-align: center;
+    }
+
+    .message.error {
+      color: #d93025;
+    }
+
+    .message.success {
+      color: #188038;
+    }
+
+    .ticket-list {
+      list-style: none;
+    }
+
+    .ticket-item {
+      padding: 16px;
+      border: 1px solid #eee;
+      border-radius: 8px;
+      margin-bottom: 12px;
+    }
+
+    .ticket-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .ticket-title {
+      font-weight: 600;
+      font-size: 1rem;
+      margin-bottom: 6px;
+    }
+
+    .ticket-desc {
+      font-size: 0.9rem;
+      color: #666;
+      margin-bottom: 8px;
+      line-height: 1.5;
+    }
+
+    .ticket-meta {
+      font-size: 0.8rem;
+      color: #999;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .status {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: #fff3e0;
+      color: #e65100;
+      font-size: 0.75rem;
+    }
+
+    .empty {
+      text-align: center;
+      color: #999;
+      padding: 24px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>提交工单</h1>
+      <form id="ticket-form">
+        <label for="title">标题</label>
+        <input type="text" id="title" name="title" placeholder="请输入工单标题" required>
+
+        <label for="description">描述</label>
+        <textarea id="description" name="description" placeholder="请描述问题详情"></textarea>
+
+        <button type="submit" id="submit-btn">提交</button>
+        <p id="form-message" class="message" hidden></p>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>工单列表</h2>
+      <ul id="ticket-list" class="ticket-list">
+        <li class="empty">加载中...</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('ticket-form');
+    const titleInput = document.getElementById('title');
+    const descInput = document.getElementById('description');
+    const submitBtn = document.getElementById('submit-btn');
+    const formMessage = document.getElementById('form-message');
+    const ticketList = document.getElementById('ticket-list');
+
+    function showMessage(text, type) {
+      formMessage.textContent = text;
+      formMessage.className = 'message ' + type;
+      formMessage.hidden = false;
+    }
+
+    function hideMessage() {
+      formMessage.hidden = true;
+    }
+
+    async function loadTickets() {
+      try {
+        const res = await fetch('/api/tickets');
+        if (!res.ok) throw new Error('加载失败');
+        const tickets = await res.json();
+        renderTickets(tickets);
+      } catch {
+        ticketList.innerHTML = '<li class="empty">加载失败，请刷新重试</li>';
+      }
+    }
+
+    function renderTickets(tickets) {
+      if (!tickets.length) {
+        ticketList.innerHTML = '<li class="empty">暂无工单</li>';
+        return;
+      }
+
+      ticketList.innerHTML = tickets.map((t) => `
+        <li class="ticket-item">
+          <div class="ticket-title">${escapeHtml(t.title)}</div>
+          <div class="ticket-desc">${escapeHtml(t.description || '无描述')}</div>
+          <div class="ticket-meta">
+            <span class="status">${escapeHtml(t.status)}</span>
+            <span>#${t.id}</span>
+            <span>${escapeHtml(t.created_at)}</span>
+          </div>
+        </li>
+      `).join('');
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      hideMessage();
+
+      const title = titleInput.value.trim();
+      const description = descInput.value.trim();
+
+      if (!title) {
+        showMessage('请填写标题', 'error');
+        return;
+      }
+
+      submitBtn.disabled = true;
+
+      try {
+        const res = await fetch('/api/tickets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, description }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || '提交失败');
+        }
+
+        showMessage('提交成功！工单 #' + data.id, 'success');
+        form.reset();
+        await loadTickets();
+      } catch (err) {
+        showMessage(err.message || '提交失败，请重试', 'error');
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+
+    loadTickets();
+  </script>
+</body>
+</html>
